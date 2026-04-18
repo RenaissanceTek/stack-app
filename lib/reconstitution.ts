@@ -1,47 +1,45 @@
-// Pure reconstitution math. No side effects. No DOM. Unit tested.
-//
-// Model:
-//   - vial contains `vialMg` milligrams of peptide powder
-//   - user adds `waterMl` milliliters of bacteriostatic water
-//   - concentration = vialMg / waterMl (mg per ml)
-//   - to deliver a dose of `doseMcg` micrograms, draw volumeMl = (doseMcg / 1000) / concentration
-//   - on a U-100 insulin syringe, 1 ml = 100 units, so units = volumeMl * 100
+// Pure math for the reconstitution calculator.
+// Given a vial of <vialMg> mg reconstituted with <bacWaterMl> ml of bac water,
+// compute the volume (ml) and U-100 syringe units needed to deliver <doseMcg>.
 
 export type ReconInput = {
   vialMg: number;
-  waterMl: number;
+  bacWaterMl: number;
   doseMcg: number;
 };
 
 export type ReconResult = {
   concentrationMgPerMl: number;
   volumeMl: number;
-  units: number;
-  dosePerUnitMcg: number;
-  exceedsVial: boolean;
+  unitsU100: number;
+  doseExceedsVial: boolean;
 };
 
-export function reconstitute(input: ReconInput): ReconResult {
-  const { vialMg, waterMl, doseMcg } = input;
-  if (!(vialMg > 0) || !(waterMl > 0) || !(doseMcg > 0)) {
-    throw new Error('vialMg, waterMl, and doseMcg must all be positive numbers.');
+export function computeReconstitution(input: ReconInput): ReconResult {
+  const { vialMg, bacWaterMl, doseMcg } = input;
+
+  if (!Number.isFinite(vialMg) || !Number.isFinite(bacWaterMl) || !Number.isFinite(doseMcg)) {
+    throw new Error('Inputs must be finite numbers');
   }
-  const concentrationMgPerMl = vialMg / waterMl;
+  if (vialMg <= 0) throw new Error('vialMg must be > 0');
+  if (bacWaterMl <= 0) throw new Error('bacWaterMl must be > 0');
+  if (doseMcg < 0) throw new Error('doseMcg must be >= 0');
+
+  const concentrationMgPerMl = vialMg / bacWaterMl;
   const doseMg = doseMcg / 1000;
   const volumeMl = doseMg / concentrationMgPerMl;
-  const units = volumeMl * 100;
-  const dosePerUnitMcg = (concentrationMgPerMl * 1000) / 100;
-  const exceedsVial = doseMg > vialMg;
+  const unitsU100 = volumeMl * 100;
+  const doseExceedsVial = doseMg > vialMg;
+
   return {
     concentrationMgPerMl,
     volumeMl,
-    units,
-    dosePerUnitMcg,
-    exceedsVial,
+    unitsU100,
+    doseExceedsVial,
   };
 }
 
-export function roundTo(value: number, decimals: number): number {
-  const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
+export function roundTo(n: number, places = 3): number {
+  const p = Math.pow(10, places);
+  return Math.round(n * p) / p;
 }

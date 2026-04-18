@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Stack",
+    "slug": "stack-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "stack",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0a0a",
+    "ios": { "bundleIdentifier": "app.stack.tracker" },
+    "android": { "package": "app.stack.tracker" },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}

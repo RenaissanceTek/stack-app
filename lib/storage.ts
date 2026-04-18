@@ -1,171 +1,113 @@
-export type Peptide = {
-  id: string;
-  name: string;
-  category: string;
-  halfLifeHours?: number;
-};
-
-export type LogEntry = {
-  id: string;
-  timestamp: number;
-  peptideName: string;
-  doseAmount: number;
-  unit: 'mg' | 'mcg';
-  site: string;
-  notes?: string;
-};
-
-export type Vial = {
-  id: string;
-  peptideName: string;
-  totalMg: number;
-  remainingMg: number;
-  bacWaterMl: number;
-  reconstitutedAt?: number;
-  expiresAt?: number;
-};
-
-export type Settings = {
-  defaultUnit: 'mg' | 'mcg';
-  theme: 'dark' | 'light';
-};
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_SETTINGS, LogEntry, Settings, Vial } from './types';
 
 export const KEYS = {
-  ONBOARDED: 'stack:v1:onboarded',
-  ACTIVE_STACK: 'stack:v1:activeStack',
-  LOGS: 'stack:v1:logs',
-  VIALS: 'stack:v1:vials',
-  SETTINGS: 'stack:v1:settings',
+  onboarded: 'stack:v1:onboarded',
+  activeStackId: 'stack:v1:active-stack-id',
+  logs: 'stack:v1:logs',
+  vials: 'stack:v1:vials',
+  settings: 'stack:v1:settings',
 } as const;
 
-export const INJECTION_SITES = [
-  'Abdomen L',
-  'Abdomen R',
-  'Thigh L',
-  'Thigh R',
-  'Delt L',
-  'Delt R',
-  'Glute L',
-  'Glute R',
-];
+export const ALL_KEYS = Object.values(KEYS);
 
-const isBrowser = () => typeof window !== 'undefined';
-
-export function getItem<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
+export async function getItem<T>(key: string, fallback: T): Promise<T> {
   try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return fallback;
+    const raw = await AsyncStorage.getItem(key);
+    if (raw == null) return fallback;
     return JSON.parse(raw) as T;
   } catch {
     return fallback;
   }
 }
 
-export function setItem<T>(key: string, value: T): void {
-  if (!isBrowser()) return;
+export async function setItem<T>(key: string, value: T): Promise<void> {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    await AsyncStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // storage full or disabled; silently drop
+    // swallow — nothing useful to do from UI path
   }
 }
 
-export function removeItem(key: string): void {
-  if (!isBrowser()) return;
+export async function removeItem(key: string): Promise<void> {
   try {
-    window.localStorage.removeItem(key);
+    await AsyncStorage.removeItem(key);
   } catch {
-    // ignore
+    // swallow
   }
 }
 
-export function updateList<T>(key: string, mutate: (prev: T[]) => T[]): T[] {
-  const prev = getItem<T[]>(key, []);
-  const next = mutate(prev);
-  setItem(key, next);
-  return next;
+export async function getOnboarded(): Promise<boolean> {
+  return getItem<boolean>(KEYS.onboarded, false);
 }
 
-export function getLogs(): LogEntry[] {
-  return getItem<LogEntry[]>(KEYS.LOGS, []);
+export async function setOnboarded(value: boolean): Promise<void> {
+  return setItem(KEYS.onboarded, value);
 }
 
-export function addLog(entry: LogEntry): LogEntry[] {
-  return updateList<LogEntry>(KEYS.LOGS, (prev) => [entry, ...prev]);
+export async function getActiveStackId(): Promise<string | null> {
+  return getItem<string | null>(KEYS.activeStackId, null);
 }
 
-export function getVials(): Vial[] {
-  return getItem<Vial[]>(KEYS.VIALS, []);
+export async function setActiveStackId(id: string): Promise<void> {
+  return setItem(KEYS.activeStackId, id);
 }
 
-export function addVial(vial: Vial): Vial[] {
-  return updateList<Vial>(KEYS.VIALS, (prev) => [vial, ...prev]);
+export async function getLogs(): Promise<LogEntry[]> {
+  const logs = await getItem<LogEntry[]>(KEYS.logs, []);
+  if (!Array.isArray(logs)) return [];
+  return logs;
 }
 
-export function getSettings(): Settings {
-  return getItem<Settings>(KEYS.SETTINGS, { defaultUnit: 'mcg', theme: 'dark' });
+export async function appendLog(entry: LogEntry): Promise<void> {
+  const logs = await getLogs();
+  logs.push(entry);
+  await setItem(KEYS.logs, logs);
 }
 
-export function setSettings(s: Settings): void {
-  setItem(KEYS.SETTINGS, s);
+export async function getVials(): Promise<Vial[]> {
+  const vials = await getItem<Vial[]>(KEYS.vials, []);
+  if (!Array.isArray(vials)) return [];
+  return vials;
 }
 
-export function getActiveStackId(): string | null {
-  return getItem<string | null>(KEYS.ACTIVE_STACK, null);
+export async function appendVial(vial: Vial): Promise<void> {
+  const vials = await getVials();
+  vials.push(vial);
+  await setItem(KEYS.vials, vials);
 }
 
-export function setActiveStackId(id: string): void {
-  setItem(KEYS.ACTIVE_STACK, id);
+export async function getSettings(): Promise<Settings> {
+  const s = await getItem<Partial<Settings>>(KEYS.settings, {});
+  return { ...DEFAULT_SETTINGS, ...s };
 }
 
-export function isOnboarded(): boolean {
-  return getItem<boolean>(KEYS.ONBOARDED, false);
+export async function setSettings(s: Settings): Promise<void> {
+  return setItem(KEYS.settings, s);
 }
 
-export function setOnboarded(): void {
-  setItem(KEYS.ONBOARDED, true);
+export async function exportAll(): Promise<string> {
+  const [onboarded, activeStackId, logs, vials, settings] = await Promise.all([
+    getOnboarded(),
+    getActiveStackId(),
+    getLogs(),
+    getVials(),
+    getSettings(),
+  ]);
+  return JSON.stringify(
+    {
+      exportedAt: new Date().toISOString(),
+      [KEYS.onboarded]: onboarded,
+      [KEYS.activeStackId]: activeStackId,
+      [KEYS.logs]: logs,
+      [KEYS.vials]: vials,
+      [KEYS.settings]: settings,
+    },
+    null,
+    2,
+  );
 }
 
-export function exportAll(): Record<string, unknown> {
-  return {
-    onboarded: getItem(KEYS.ONBOARDED, false),
-    activeStack: getItem(KEYS.ACTIVE_STACK, null),
-    logs: getLogs(),
-    vials: getVials(),
-    settings: getSettings(),
-    exportedAt: new Date().toISOString(),
-  };
-}
-
-export function resetAll(): void {
-  if (!isBrowser()) return;
-  Object.values(KEYS).forEach((k) => removeItem(k));
-}
-
-export function computeStreakDays(logs: LogEntry[]): number {
-  if (logs.length === 0) return 0;
-  const dayKeys = new Set<string>();
-  for (const l of logs) {
-    const d = new Date(l.timestamp);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    dayKeys.add(key);
-  }
-  let streak = 0;
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  while (true) {
-    const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
-    if (dayKeys.has(key)) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-  return streak;
-}
-
-export function makeId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export async function resetAll(): Promise<void> {
+  await Promise.all(ALL_KEYS.map((k) => removeItem(k)));
 }

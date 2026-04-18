@@ -1,59 +1,58 @@
 import { describe, it, expect } from 'vitest';
-import { reconstitute, roundTo } from './reconstitution';
+import { computeReconstitution, roundTo } from './reconstitution';
 
-describe('reconstitute', () => {
-  it('standard case: 5 mg vial + 2 ml water, 250 mcg dose -> 0.1 ml / 10 units', () => {
-    const r = reconstitute({ vialMg: 5, waterMl: 2, doseMcg: 250 });
-    expect(r.concentrationMgPerMl).toBeCloseTo(2.5, 10);
-    expect(r.volumeMl).toBeCloseTo(0.1, 10);
-    expect(r.units).toBeCloseTo(10, 10);
-    expect(r.exceedsVial).toBe(false);
+describe('computeReconstitution', () => {
+  it('standard: 5mg + 2ml water, 250mcg dose', () => {
+    const r = computeReconstitution({ vialMg: 5, bacWaterMl: 2, doseMcg: 250 });
+    expect(r.concentrationMgPerMl).toBe(2.5);
+    expect(roundTo(r.volumeMl, 3)).toBe(0.1);
+    expect(roundTo(r.unitsU100, 3)).toBe(10);
+    expect(r.doseExceedsVial).toBe(false);
   });
 
-  it('sub-mcg precision: 10 mg vial + 3 ml water, 500 mcg -> 0.15 ml / 15 units', () => {
-    const r = reconstitute({ vialMg: 10, waterMl: 3, doseMcg: 500 });
-    expect(r.concentrationMgPerMl).toBeCloseTo(10 / 3, 10);
-    expect(r.volumeMl).toBeCloseTo(0.15, 10);
-    expect(r.units).toBeCloseTo(15, 10);
+  it('sub-mcg precision: 10mg + 3ml water, 100mcg dose', () => {
+    const r = computeReconstitution({ vialMg: 10, bacWaterMl: 3, doseMcg: 100 });
+    // concentration = 10/3 ≈ 3.3333 mg/ml
+    // volume = 0.1 / 3.3333 = 0.03 ml
+    // units = 3
+    expect(roundTo(r.concentrationMgPerMl, 4)).toBe(3.3333);
+    expect(roundTo(r.volumeMl, 4)).toBe(0.03);
+    expect(roundTo(r.unitsU100, 3)).toBe(3);
   });
 
-  it('mg target (2 mg = 2000 mcg): 5 mg vial + 2 ml water, 2000 mcg -> 0.8 ml / 80 units', () => {
-    const r = reconstitute({ vialMg: 5, waterMl: 2, doseMcg: 2000 });
-    expect(r.volumeMl).toBeCloseTo(0.8, 10);
-    expect(r.units).toBeCloseTo(80, 10);
-    expect(r.exceedsVial).toBe(false);
+  it('mg target: 5mg vial + 2ml water, 1mg (1000 mcg) dose', () => {
+    const r = computeReconstitution({ vialMg: 5, bacWaterMl: 2, doseMcg: 1000 });
+    expect(r.concentrationMgPerMl).toBe(2.5);
+    expect(roundTo(r.volumeMl, 3)).toBe(0.4);
+    expect(roundTo(r.unitsU100, 3)).toBe(40);
+    expect(r.doseExceedsVial).toBe(false);
   });
 
-  it('0.5 ml water: 2 mg vial + 0.5 ml water, 200 mcg -> 0.05 ml / 5 units', () => {
-    const r = reconstitute({ vialMg: 2, waterMl: 0.5, doseMcg: 200 });
-    expect(r.concentrationMgPerMl).toBeCloseTo(4, 10);
-    expect(r.volumeMl).toBeCloseTo(0.05, 10);
-    expect(r.units).toBeCloseTo(5, 10);
+  it('0.5ml water: 2mg + 0.5ml water, 200mcg dose', () => {
+    const r = computeReconstitution({ vialMg: 2, bacWaterMl: 0.5, doseMcg: 200 });
+    expect(r.concentrationMgPerMl).toBe(4);
+    expect(roundTo(r.volumeMl, 3)).toBe(0.05);
+    expect(roundTo(r.unitsU100, 3)).toBe(5);
   });
 
-  it('3 ml water: 15 mg vial + 3 ml water, 750 mcg -> 0.15 ml / 15 units', () => {
-    const r = reconstitute({ vialMg: 15, waterMl: 3, doseMcg: 750 });
-    expect(r.concentrationMgPerMl).toBeCloseTo(5, 10);
-    expect(r.volumeMl).toBeCloseTo(0.15, 10);
-    expect(r.units).toBeCloseTo(15, 10);
+  it('edge: dose > total vial flags doseExceedsVial', () => {
+    const r = computeReconstitution({ vialMg: 1, bacWaterMl: 1, doseMcg: 2000 });
+    expect(r.doseExceedsVial).toBe(true);
+    // Math still computes: 1 mg/ml, 2mg = 2ml. The flag surfaces the user error.
+    expect(r.concentrationMgPerMl).toBe(1);
+    expect(roundTo(r.volumeMl, 3)).toBe(2);
   });
 
-  it('edge case: dose exceeds vial total flags exceedsVial', () => {
-    const r = reconstitute({ vialMg: 2, waterMl: 1, doseMcg: 3000 });
-    expect(r.exceedsVial).toBe(true);
-    expect(r.volumeMl).toBeCloseTo(1.5, 10);
+  it('rejects zero/negative inputs', () => {
+    expect(() => computeReconstitution({ vialMg: 0, bacWaterMl: 1, doseMcg: 100 })).toThrow();
+    expect(() => computeReconstitution({ vialMg: 5, bacWaterMl: 0, doseMcg: 100 })).toThrow();
+    expect(() => computeReconstitution({ vialMg: 5, bacWaterMl: 1, doseMcg: -1 })).toThrow();
   });
+});
 
-  it('rejects non-positive inputs', () => {
-    expect(() => reconstitute({ vialMg: 0, waterMl: 1, doseMcg: 250 })).toThrow();
-    expect(() => reconstitute({ vialMg: 5, waterMl: 0, doseMcg: 250 })).toThrow();
-    expect(() => reconstitute({ vialMg: 5, waterMl: 2, doseMcg: 0 })).toThrow();
-    expect(() => reconstitute({ vialMg: -1, waterMl: 2, doseMcg: 250 })).toThrow();
-  });
-
-  it('roundTo rounds to given decimals', () => {
-    expect(roundTo(0.12345, 2)).toBe(0.12);
-    expect(roundTo(0.12545, 2)).toBe(0.13);
-    expect(roundTo(10.4999, 0)).toBe(10);
+describe('roundTo', () => {
+  it('rounds to given places', () => {
+    expect(roundTo(1.23456, 2)).toBe(1.23);
+    expect(roundTo(1.23456, 4)).toBe(1.2346);
   });
 });

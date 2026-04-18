@@ -46,7 +46,12 @@ export const SEED_STACKS: SeedStack[] = [
     goal: 'Skin',
     summary: 'Copper peptide for skin firmness and collagen synthesis.',
     peptides: [
-      { name: 'GHK-Cu', doseRange: '1-2 mg', frequency: 'Daily (topical or SC)', route: 'Topical / Subcutaneous' },
+      {
+        name: 'GHK-Cu',
+        doseRange: '1-2 mg',
+        frequency: 'Daily (topical or SC)',
+        route: 'Topical / Subcutaneous',
+      },
     ],
     timelineWeeks: [
       { week: 4, note: 'Skin texture improvements reported.' },

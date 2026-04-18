@@ -1,44 +1,32 @@
-# Stack — Peptide Protocol Tracker
+# Stack
 
-A PWA for tracking peptide protocols. v1 is local-only (no backend, no account) — data lives in your browser.
+Peptide protocol tracker. Pick a stack, log injections, track outcomes. Local-only (AsyncStorage) — no backend, no auth.
 
-## What you get
+Built with Expo SDK 51 + React Native + Expo Router v3 + TypeScript.
 
-- Curated protocol library (4 seeded stacks)
-- Dose logger with injection-site rotation map
-- Reconstitution calculator (U-100 syringe units)
-- Vial inventory with remaining-amount tracking
-- Export all data as JSON
+## Run locally
 
-## Getting started
-
-```bash
+```
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Opens Expo web preview on port 5000.
 
-## Running tests
+On Replit, the Mobile App template auto-detects the Expo config and opens the phone-frame preview with "Simulate on Web" and "Try on device" buttons.
 
-```bash
+## Test
+
+```
 npm test
 ```
 
-Reconstitution math is covered by unit tests. They must all pass.
+Runs the reconstitution calculator math tests.
 
-## Install on iOS
+## Structure
 
-On iPhone, open the deployed URL in Safari, tap Share, tap Add to Home Screen. The app will launch full-screen from your home screen.
-
-## Tech stack
-
-- Next.js 14 (app router)
-- TypeScript (strict)
-- Tailwind CSS
-- next-pwa for service worker + manifest
-- vitest for unit tests
-
-## Disclaimer
-
-Educational and tracking use only. Not medical advice. Consult a licensed provider before starting any protocol.
+- `app/` — Expo Router screens
+- `components/` — shared RN components
+- `content/stacks.ts` — seeded stack data
+- `lib/storage.ts` — typed AsyncStorage wrapper
+- `lib/reconstitution.ts` — pure math for the calculator
